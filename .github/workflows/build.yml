@@ -51,7 +51,7 @@ jobs:
     steps:
       - name: Prepare macOS Environment
         run: |
-          brew install 'qt@5'
+          brew install 'qt@5' gnu-tar
           brew link 'qt@5' --force
 
       - name: Clone
@@ -78,7 +78,7 @@ jobs:
 
           # download and bundle PCANUSB library
           mkdir -p "$contents_dir/Frameworks"
-          curl -sSL "$pcan_usb_url" | tar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
+          curl -sSL "$pcan_usb_url" | gtar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
 
           echo "Prepared files:"
           find SavvyCAN.app | sed 's/^/  /'
