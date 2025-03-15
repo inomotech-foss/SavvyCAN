@@ -8,6 +8,9 @@ on:
     tags:
       - "V*"
 
+permissions:
+  contents: write
+
 jobs:
   buildlinux:
     name: Linux x64
