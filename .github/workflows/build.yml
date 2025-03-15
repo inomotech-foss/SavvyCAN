@@ -46,8 +46,9 @@ jobs:
     steps:
       - name: Prepare macOS Environment
         run: |
-            brew install qt5
-            brew link qt5 --force
+          brew install 'qt@5'
+          brew link 'qt@5' --force
+          find "$(brew --prefix 'qt@5')"
 
       - name: Clone
         uses: actions/checkout@v3
