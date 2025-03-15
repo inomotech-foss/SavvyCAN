@@ -65,11 +65,20 @@ jobs:
       - name: Package     
         run: |
           qt5_dir=$(brew --prefix 'qt@5')
-          mkdir -p SavvyCAN.app/Contents/MacOS/help
-          cp -R help/* SavvyCAN.app/Contents/MacOS/help
+          pcan_usb_url="https://github.com/mac-can/PCBUSB-Library/releases/download/v0.13/macOS_Library_for_PCANUSB_v0.13.tar.gz"
+          contents_dir="SavvyCAN.app/Contents"
+
+          # copy help
+          mkdir -p "$contents_dir/MacOS/help"
+          cp -R help/* "$contents_dir/MacOS/help"
+
           # copy canbus plugins
-          mkdir -p SavvyCAN.app/Contents/PlugIns/canbus
-          cp -R "$qt5_dir/plugins/canbus"/* SavvyCAN.app/Contents/PlugIns/canbus
+          mkdir -p "$contents_dir/PlugIns/canbus"
+          cp -R "$qt5_dir/plugins/canbus"/* "$contents_dir/PlugIns/canbus"
+
+          # download and bundle PCANUSB library
+          mkdir -p "$contents_dir/Frameworks"
+          curl -sSL "$pcan_usb_url" | tar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
 
           echo "Prepared files:"
           find SavvyCAN.app | sed 's/^/  /'
