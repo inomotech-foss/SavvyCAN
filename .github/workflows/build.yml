@@ -6,7 +6,6 @@ on:
       - "master"
       - "inomo"
     tags:
-      - "v*"
 
 jobs:
   buildlinux:
