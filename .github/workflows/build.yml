@@ -51,7 +51,7 @@ jobs:
     steps:
       - name: Prepare macOS Environment
         run: |
-          brew install 'qt@5' gnu-tar
+          brew install 'qt@5'
           brew link 'qt@5' --force
 
       - name: Clone
@@ -65,7 +65,8 @@ jobs:
       - name: Package     
         run: |
           qt5_dir=$(brew --prefix 'qt@5')
-          pcan_usb_url="https://github.com/mac-can/PCBUSB-Library/releases/download/v0.13/macOS_Library_for_PCANUSB_v0.13.tar.gz"
+          pcan_usb_version="0.13"
+          pcan_usb_url="https://github.com/mac-can/PCBUSB-Library/releases/download/v${pcan_usb_version}/macOS_Library_for_PCANUSB_v${pcan_usb_version}.tar.gz"
           contents_dir="SavvyCAN.app/Contents"
 
           # copy help
@@ -79,6 +80,7 @@ jobs:
           # download and bundle PCANUSB library
           mkdir -p "$contents_dir/Frameworks"
           curl -sSL "$pcan_usb_url" | gtar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
+          ln -s "$contents_dir/Frameworks/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
 
           echo "Prepared files:"
           find SavvyCAN.app | sed 's/^/  /'
