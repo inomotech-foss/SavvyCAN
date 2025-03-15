@@ -45,8 +45,8 @@ jobs:
           path: SavvyCAN-*x86_64.AppImage
       
   buildmacos:
-    name: macOS
-    runs-on: macos-15
+    name: macOS x64
+    runs-on: macos-13
 
     steps:
       - name: Prepare macOS Environment
