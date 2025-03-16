@@ -80,7 +80,7 @@ jobs:
           # download and bundle PCANUSB library
           mkdir -p "$contents_dir/Frameworks"
           curl -sSL "$pcan_usb_url" | gtar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
-          ln -s "$contents_dir/Frameworks/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
+          ln -rs "$contents_dir/Frameworks/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
 
           echo "Prepared files:"
           find SavvyCAN.app | sed 's/^/  /'
