@@ -78,9 +78,10 @@ jobs:
           cp -R "$qt5_dir/plugins/canbus"/* "$contents_dir/PlugIns/canbus"
 
           # download and bundle PCANUSB library
+          temp_dir=$(mktemp -d)
+          curl -sSL "$pcan_usb_url" | gtar -C "$temp_dir" -zx --wildcards '*.dylib'
           mkdir -p "$contents_dir/Frameworks"
-          curl -sSL "$pcan_usb_url" | gtar -C "$contents_dir/Frameworks" -zx --wildcards '*.dylib' --transform='s/.*\///'
-          ln -rs "$contents_dir/Frameworks/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
+          mv "$temp_dir/PCBUSB/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
 
           echo "Prepared files:"
           find SavvyCAN.app | sed 's/^/  /'
