@@ -3,197 +3,218 @@ name: Build
 on:
   push:
     branches:
-      - "master"
+    - "master"
+    - "inomo"
+    tags:
+    - "V*"
+
+permissions:
+  contents: write
+
 jobs:
   buildlinux:
     name: Linux x64
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Prepare Environment
-        run: |
-            sudo apt-get install libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-randr0 libxkbcommon-x11-0 libfuse2
+    - name: Prepare Environment
+      run: |
+        sudo apt-get install libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xinerama0 libxcb-randr0 libxkbcommon-x11-0 libfuse2
 
-      - name: Prepare Qt Libraries
-        uses: jurplel/install-qt-action@v3
+    - name: Prepare Qt Libraries
+      uses: jurplel/install-qt-action@v3
 
-      - name: Clone
-        uses: actions/checkout@v3
+    - name: Clone
+      uses: actions/checkout@v3
 
-      - name: Compile
-        run: |
-          qmake CONFIG+=release PREFIX=/usr SavvyCAN.pro
-          make -j`grep -c ^processor /proc/cpuinfo`
-          
-      - name: Package     
-        run: |
-          make INSTALL_ROOT=appdir install
-          wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
-          chmod a+x linuxdeployqt-continuous-x86_64.AppImage
-          ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/SavvyCAN.desktop -appimage -extra-plugins=iconengines,platformthemes/libqgtk3.so,canbus
+    - name: Compile
+      run: |
+        qmake CONFIG+=release PREFIX=/usr SavvyCAN.pro
+        make -j`grep -c ^processor /proc/cpuinfo`
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: SavvyCAN-Linux_x64.AppImage
-          path: SavvyCAN-*x86_64.AppImage
-      
+    - name: Package
+      run: |
+        make INSTALL_ROOT=appdir install
+        wget -c -nv "https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage"
+        chmod a+x linuxdeployqt-continuous-x86_64.AppImage
+        ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/SavvyCAN.desktop -appimage -extra-plugins=iconengines,platformthemes/libqgtk3.so,canbus
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SavvyCAN-Linux_x64.AppImage
+        path: SavvyCAN-*x86_64.AppImage
+        if-no-files-found: error
+
   buildmacos86:
     name: macOS x64
-    runs-on: macos-13
+    runs-on: macos-15-intel
 
     steps:
-      - name: Prepare macOS Environment
-        run: |
-            brew install qt@5
-            brew link qt@5 --force
+    - name: Prepare macOS Environment
+      run: |
+        brew install 'qt@5'
+        brew link 'qt@5' --force
 
-      - name: Clone
-        uses: actions/checkout@v3
+    - name: Clone
+      uses: actions/checkout@v3
 
-      - name: Compile     
-        run: |
-          qmake CONFIG+=release CONFIG+=sdk_no_version_check SavvyCAN.pro
-          make -j`sysctl kern.aioprocmax | awk '{print $2}'`
+    - name: Compile
+      run: |
+        qmake CONFIG+=release CONFIG+=sdk_no_version_check SavvyCAN.pro
+        make -j`sysctl kern.aioprocmax | awk '{print $2}'`
 
-      - name: Package     
-        run: |
-          mkdir -p SavvyCAN.app/Contents/MacOS/help
-          cp -R help/* SavvyCAN.app/Contents/MacOS/help
-          macdeployqt SavvyCAN.app -dmg
-          mv SavvyCAN.dmg SavvyCAN_x64.dmg
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: SavvyCAN-macOS_x64.dmg
-          path: SavvyCAN_x64.dmg
+    - name: Package
+      run: |
+        qt5_dir=$(brew --prefix 'qt@5')
+        pcan_usb_version="0.13"
+        pcan_usb_url="https://github.com/mac-can/PCBUSB-Library/releases/download/v${pcan_usb_version}/macOS_Library_for_PCANUSB_v${pcan_usb_version}.tar.gz"
+        contents_dir="SavvyCAN.app/Contents"
+
+        # copy help
+        mkdir -p "$contents_dir/MacOS/help"
+        cp -R help/* "$contents_dir/MacOS/help"
+
+        # copy canbus plugins
+        mkdir -p "$contents_dir/PlugIns/canbus"
+        cp -R "$qt5_dir/plugins/canbus"/* "$contents_dir/PlugIns/canbus"
+
+        # download and bundle PCANUSB library
+        temp_dir=$(mktemp -d)
+        curl -sSL "$pcan_usb_url" | gtar -C "$temp_dir" -zx --wildcards '*.dylib'
+        mkdir -p "$contents_dir/Frameworks"
+        mv "$temp_dir/PCBUSB/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
+
+        echo "Prepared files:"
+        find SavvyCAN.app | sed 's/^/  /'
+
+        macdeployqt SavvyCAN.app -dmg
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SavvyCAN-macOS_x64.dmg
+        path: SavvyCAN.dmg
+        if-no-files-found: error
 
   buildmacos-arm64:
     name: macOS ARM64
-    runs-on: macos-14
+    runs-on: macos-15
 
     steps:
-      - name: Prepare macOS Environment
-        run: |
-            brew install qt@5
-            brew link qt@5 --force
+    - name: Prepare macOS Environment
+      run: |
+        brew install 'qt@5'
+        brew link 'qt@5' --force
 
-      - name: Clone
-        uses: actions/checkout@v3
+    - name: Clone
+      uses: actions/checkout@v3
 
-      - name: Compile     
-        run: |
-          qmake CONFIG+=release CONFIG+=sdk_no_version_check SavvyCAN.pro
-          make -j`sysctl kern.aioprocmax | awk '{print $2}'`
+    - name: Compile
+      run: |
+        qmake CONFIG+=release CONFIG+=sdk_no_version_check SavvyCAN.pro
+        make -j`sysctl kern.aioprocmax | awk '{print $2}'`
 
-      - name: Package     
-        run: |
-          mkdir -p SavvyCAN.app/Contents/MacOS/help
-          cp -R help/* SavvyCAN.app/Contents/MacOS/help
-          macdeployqt SavvyCAN.app -dmg
-          mv SavvyCAN.dmg SavvyCAN_arm64.dmg
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: SavvyCAN-macOS_ARM64.dmg
-          path: SavvyCAN_arm64.dmg
-          
+    - name: Package
+      run: |
+        qt5_dir=$(brew --prefix 'qt@5')
+        pcan_usb_version="0.13"
+        pcan_usb_url="https://github.com/mac-can/PCBUSB-Library/releases/download/v${pcan_usb_version}/macOS_Library_for_PCANUSB_v${pcan_usb_version}.tar.gz"
+        contents_dir="SavvyCAN.app/Contents"
+
+        # copy help
+        mkdir -p "$contents_dir/MacOS/help"
+        cp -R help/* "$contents_dir/MacOS/help"
+
+        # copy canbus plugins
+        mkdir -p "$contents_dir/PlugIns/canbus"
+        cp -R "$qt5_dir/plugins/canbus"/* "$contents_dir/PlugIns/canbus"
+
+        # download and bundle PCANUSB library
+        temp_dir=$(mktemp -d)
+        curl -sSL "$pcan_usb_url" | gtar -C "$temp_dir" -zx --wildcards '*.dylib'
+        mkdir -p "$contents_dir/Frameworks"
+        mv "$temp_dir/PCBUSB/libPCBUSB.${pcan_usb_version}.dylib" "$contents_dir/Frameworks/libPCBUSB.dylib"
+
+        echo "Prepared files:"
+        find SavvyCAN.app | sed 's/^/  /'
+
+        macdeployqt SavvyCAN.app -dmg
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SavvyCAN-macOS_ARM64.dmg
+        path: SavvyCAN.dmg
+        if-no-files-found: error
+
   buildwindows:
     name: Windows x64
     runs-on: windows-2022
 
-    steps:      
-      - name: Prepare Qt Libraries
-        uses: jurplel/install-qt-action@v3
+    steps:
+    - name: Prepare Qt Libraries
+      uses: jurplel/install-qt-action@v3
 
-      - name: Clone
-        uses: actions/checkout@v3
-      
-      - name: Compile
-        shell: cmd
-        run: | 
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          qmake CONFIG+=release SavvyCAN.pro
-          nmake /C
+    - name: Clone
+      uses: actions/checkout@v3
 
-      - name: Package
-        run: |
-          mkdir package
-          copy "release/SavvyCAN.exe" package/
-          mkdir package/help
-          copy  help/*.md package/help/
-          mkdir package/help/images
-          copy help/images/*.* package/help/images/
-          mkdir package/examples
-          copy examples/*.* package/examples/          
-          copy "${Env:Qt5_Dir}/bin/Qt5Core.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5Gui.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5Network.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5PrintSupport.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5Qml.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5SerialBus.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5SerialPort.dll" package/
-          copy "${Env:Qt5_Dir}/bin/Qt5Widgets.dll" package/
-          mkdir package/imageformats
-          copy "${Env:Qt5_Dir}/plugins/imageformats/*.*" package/imageformats/
-          mkdir package/platforms
-          copy "${Env:Qt5_Dir}/plugins/platforms/*.*" package/platforms/
-          mkdir package/styles
-          copy "${Env:Qt5_Dir}/plugins/styles/*.*" package/styles/
-          mkdir package/canbus
-          copy "${Env:Qt5_Dir}/plugins/canbus/*.*" package/canbus/
+    - name: Compile
+      shell: cmd
+      run: |
+        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        qmake CONFIG+=release SavvyCAN.pro
+        nmake /C
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: SavvyCAN-Windows_x64
-          path: package
- 
+    - name: Package
+      run: |
+        mkdir package
+        copy "release/SavvyCAN.exe" package/
+        mkdir package/help
+        copy  help/*.md package/help/
+        mkdir package/help/images
+        copy help/images/*.* package/help/images/
+        mkdir package/examples
+        copy examples/*.* package/examples/          
+        copy "${Env:Qt5_Dir}/bin/Qt5Core.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5Gui.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5Network.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5PrintSupport.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5Qml.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5SerialBus.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5SerialPort.dll" package/
+        copy "${Env:Qt5_Dir}/bin/Qt5Widgets.dll" package/
+        mkdir package/imageformats
+        copy "${Env:Qt5_Dir}/plugins/imageformats/*.*" package/imageformats/
+        mkdir package/platforms
+        copy "${Env:Qt5_Dir}/plugins/platforms/*.*" package/platforms/
+        mkdir package/styles
+        copy "${Env:Qt5_Dir}/plugins/styles/*.*" package/styles/
+        mkdir package/canbus
+        copy "${Env:Qt5_Dir}/plugins/canbus/*.*" package/canbus/
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: SavvyCAN-Windows_x64
+        path: package
+        if-no-files-found: error
+
   pre-release:
+    if: startsWith(github.ref, 'refs/tags/')
     name: "pre-release"
     runs-on: "ubuntu-latest"
-    needs: [buildwindows, buildmacos86, buildmacos-arm64, buildlinux]
+    needs: [ buildwindows, buildmacos86, buildmacos-arm64, buildlinux ]
 
     steps:
-      - uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v4.1.7
+    - uses: actions/download-artifact@v4.1.7
 
-      - name: Display structure of downloaded files
-        run: zip -r SavvyCAN-Windows_x64_CIBuild.zip SavvyCAN-Windows_x64
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "continuous"
-          prerelease: true
-          title: "Development Build"
-          files: |
-            SavvyCAN-Linux_x64.AppImage/SavvyCAN-*x86_64.AppImage
-            SavvyCAN-Windows_x64_CIBuild.zip
-            SavvyCAN-macOS_x64.dmg/SavvyCAN_x64.dmg
-            SavvyCAN-macOS_ARM64.dmg/SavvyCAN_arm64.dmg
-          
-  notify:
-    name: Notify Discord
-    runs-on: ubuntu-latest
-    needs: [buildwindows, buildmacos86, buildmacos-arm64, buildlinux]
-    steps:
-      - id: msg_var
-        name: remove newlines
-        run: |
-          export release_msg=$(cat << EOF
-          ${{ github.event.head_commit.message }} 
-          EOF
-          )
-          release_msg="${release_msg//$'\n'/'-'}"
-          release_msg="${release_msg//$'\r'/'-'}"
-          release_msg="${release_msg//$'('/'-'}"
-          release_msg="${release_msg//$')'/'-'}"
-          echo $release_msg
-          echo "{msg}={$release_msg}" >> $GITHUB_OUTPUT
-                                                                  
-      - name: Notify Discord
-        run: |
-          curl -i -H "Accept: application/json" \
-          -H "Content-Type:application/json" \
-          -X POST \
-          --data "{\"content\": null,\"embeds\": [{\"title\": \"${{ github.repository }} Build Complete\",      \"description\": \"${{ steps.msg_var.outputs.msg }} \\nCommit: ${{ github.sha }}\\n[Build Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}#artifacts)\",      \"color\": 5131997,      \"author\": {        \"name\": \"Github Builds\"      }    }  ]}" \
-          https://discord.com/api/webhooks/${{ secrets.WEBHOOK_ID }}/${{ secrets.WEBHOOK_TOKEN }}
+    - name: Display structure of downloaded files
+      run: zip -r SavvyCAN-Windows_x64_CIBuild.zip SavvyCAN-Windows_x64
+
+    - name: Release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          SavvyCAN-Linux_x64.AppImage/SavvyCAN-*x86_64.AppImage
+          SavvyCAN-Windows_x64_CIBuild.zip
+          SavvyCAN-macOS_x64.dmg/SavvyCAN_x64.dmg
+          SavvyCAN-macOS_ARM64.dmg/SavvyCAN_arm64.dmg
